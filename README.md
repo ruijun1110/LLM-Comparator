@@ -41,7 +41,7 @@ A Streamlit application for comparing large language model responses with collab
 
 5. **Run the application locally**
    ```bash
-   streamlit run ./pages/1_home.py
+   streamlit run app.py
    ```
 
 ## 📂 Project Structure
@@ -51,9 +51,7 @@ LLM-Comparator/
 ├── assets/                      # Static assets
 │   ├── images/                  # Image resources
 │   └── style.css                # Custom CSS styling
-├── pages/                       # Streamlit pages
-│   └── 1_home.py                # Home page with comparison UI
-├── main.py                      # Application entry point
+├── app.py                       # Application entry point
 ├── requirements.txt             # Python dependencies
 ├── .env                         # Environment variables (not tracked by git)
 ├── .gitignore                   # Git ignore file
