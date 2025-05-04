@@ -78,19 +78,50 @@ class LLMComparatorApp:
                                     st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
                                 model_id = self.model_manager.models_options[current_model]
                                 prompt = st.session_state.prompt.text
-                                st.write_stream(
-                                    self.utils.stream_openai_response(
-                                        url=url,
-                                        prompt=prompt,
-                                        api_key=api_key,
-                                        model=model_id,
-                                        temperature=st.session_state.get("temperature", 0.5),
-                                        max_tokens=st.session_state.get("max_token", 1000)
-                                    )
-                                )
+                                # Streaming logic with metrics
+                                response_placeholder = st.empty()
+                                full_response = ""
+                                response_metrics = {
+                                    "time": 0.0,
+                                    "total_tokens": 0,
+                                    "prompt_tokens": 0,
+                                    "completion_tokens": 0,
+                                    "model": model_id,
+                                    "finish_reason": ""
+                                }
+                                for chunk in self.utils.stream_openai_response(
+                                    url=url,
+                                    prompt=prompt,
+                                    api_key=api_key,
+                                    model=model_id,
+                                    temperature=st.session_state.get("temperature", 0.5),
+                                    max_tokens=st.session_state.get("max_token", 1000)
+                                ):
+                                    if chunk["type"] == "content":
+                                        if chunk["content"]:
+                                            full_response += chunk["content"]
+                                            response_placeholder.markdown(full_response + "▌")
+                                        usage = chunk.get("usage", {})
+                                        if usage:
+                                            response_metrics["total_tokens"] = usage.get("total_tokens", 0)
+                                            response_metrics["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                                            response_metrics["completion_tokens"] = usage.get("completion_tokens", 0)
+                                        if chunk.get("finish_reason"):
+                                            response_metrics["finish_reason"] = chunk["finish_reason"]
+                                    elif chunk["type"] == "done":
+                                        response_metrics["time"] = chunk["time"]
+                                    elif chunk["type"] == "error":
+                                        response_placeholder.error(f"Error: {chunk['error']}")
+                                # Remove cursor
+                                response_placeholder.markdown(full_response)
+                                # display response time
+                                model_response_header.write(f"{response_metrics['time']:.2f}s")
+                                # display total tokens
                                 model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
+                                model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
+                                
                                 if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                                    self.final_modal_dialog(current_model, st.session_state.prompt.text, "? s", "? tokens", "This is a test response")
+                                    self.final_modal_dialog(current_model, st.session_state.prompt.text, f"{response_metrics['time']:.2f}s", response_metrics['total_tokens'], full_response)
 
     @staticmethod
     @st.dialog("🎉 Congratulations 🎉")

@@ -5,6 +5,19 @@ import asyncio
 import threading
 import queue
 import json
+import time
+from dataclasses import dataclass
+from typing import Generator, Dict, Any
+
+@dataclass
+class StreamResponse:
+    content: str = ""
+    total_tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    response_time: float = 0.0
+    model: str = ""
+    finish_reason: str = ""
 
 class Utils:
     @staticmethod
@@ -13,8 +26,7 @@ class Utils:
             st.html(f"<style>{f.read()}</style>")
 
     @staticmethod
-    def stream_openai_response(url, prompt, api_key, model, temperature=0.5, max_tokens=1000):
-        print(f"DEBUG: url: {url}, api_key: {api_key}, model: {model}")
+    def stream_openai_response(url, prompt, api_key, model, temperature=0.5, max_tokens=1000) -> Generator[Dict[str, Any], None, None]:
         headers = {"Authorization": f"Bearer {api_key}"}
         payload = {
             "model": model,
@@ -23,33 +35,43 @@ class Utils:
             "max_tokens": max_tokens,
             "stream": True,
         }
-        async def fetch():
-            async with httpx.AsyncClient(timeout=60) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    print(f"DEBUG: {response}")
-                    async for line in response.aiter_lines():
-                        if line.startswith("data: "):
-                            data = line[6:]
-                            if data.strip() == "[DONE]":
-                                break
-                            try:
-                                delta = json.loads(data)
-                                content = delta.get("choices", [{}])[0].get("delta", {}).get("content")
-                                if content:
-                                    yield content
-                            except Exception:
-                                continue
+        start_time = time.time()
+        def run_stream(q):
+            async def fetch():
+                try:
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        async with client.stream("POST", url, headers=headers, json=payload) as response:
+                            async for line in response.aiter_lines():
+                                if line.startswith("data: "):
+                                    data = line[6:]
+                                    if data.strip() == "[DONE]":
+                                        break
+                                    try:
+                                        delta = json.loads(data)
+                                        # OpenAI stream response: {"choices":[{"delta":{"content":"..."}}], ...}
+                                        content = delta.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                        finish_reason = delta.get("choices", [{}])[0].get("finish_reason", "")
+                                        usage = delta.get("usage", {})
+                                        q.put({
+                                            "type": "content",
+                                            "content": content,
+                                            "usage": usage,
+                                            "finish_reason": finish_reason,
+                                            "model": model
+                                        })
+                                    except Exception:
+                                        continue
+                    # After streaming is done, send done event
+                    end_time = time.time()
+                    q.put({"type": "done", "time": end_time - start_time})
+                except Exception as e:
+                    q.put({"type": "error", "error": str(e)})
+            asyncio.run(fetch())
         q = queue.Queue()
-        sentinel = object()
-        def runner():
-            async def consume():
-                async for chunk in fetch():
-                    q.put(chunk)
-                q.put(sentinel)
-            asyncio.run(consume())
-        threading.Thread(target=runner, daemon=True).start()
+        threading.Thread(target=run_stream, args=(q,), daemon=True).start()
         while True:
             item = q.get()
-            if item is sentinel:
+            if item.get("type") == "done":
+                yield item
                 break
             yield item 
