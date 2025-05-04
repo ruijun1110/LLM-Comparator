@@ -32,6 +32,60 @@ class LLMComparatorApp:
         config_sidebar.button(button_text, key="select_all_button", use_container_width=True, on_click=lambda: self.model_manager.toggle_all(st.session_state))
         self.model_manager.update_all_selected_state(st.session_state)
 
+    def render_model_card(self, current_model, prompt):
+        model_card_key = f"model-card-{current_model}"
+        model_card = st.container(key=model_card_key, border=False)
+        with model_card:
+            model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
+            model_response_header.write(f"{current_model}")
+            url = self.model_manager.models_endpoints[current_model]
+            api_key = st.session_state.get(self.model_manager.models_api_keys[current_model], "")
+            if api_key == "":
+                st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
+            model_id = self.model_manager.models_options[current_model]
+            # Streaming logic with metrics
+            response_placeholder = st.empty()
+            full_response = ""
+            response_metrics = {
+                "time": 0.0,
+                "total_tokens": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "model": model_id,
+                "finish_reason": ""
+            }
+            for chunk in self.utils.stream_openai_response(
+                url=url,
+                prompt=prompt,
+                api_key=api_key,
+                model=model_id,
+                temperature=st.session_state.get("temperature", 0.5),
+                max_tokens=st.session_state.get("max_token", 1000)
+            ):
+                if chunk["type"] == "content":
+                    if chunk["content"]:
+                        full_response += chunk["content"]
+                        response_placeholder.markdown(full_response + "▌")
+                    usage = chunk.get("usage", {})
+                    if usage:
+                        response_metrics["total_tokens"] = usage.get("total_tokens", 0)
+                        response_metrics["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                        response_metrics["completion_tokens"] = usage.get("completion_tokens", 0)
+                    if chunk.get("finish_reason"):
+                        response_metrics["finish_reason"] = chunk["finish_reason"]
+                elif chunk["type"] == "done":
+                    response_metrics["time"] = chunk["time"]
+                elif chunk["type"] == "error":
+                    response_placeholder.error(f"Error: {chunk['error']}")
+            # Remove cursor
+            response_placeholder.markdown(full_response)
+            # Display metrics
+            model_response_header.write(f"{response_metrics['time']:.2f}s")
+            model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
+            model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
+            if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
+                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", response_metrics['total_tokens'], full_response)
+
     def render_main(self):
         chat_input_container = st.container(border=False)
         selected_models = self.model_manager.get_selected_models(st.session_state)
@@ -67,61 +121,7 @@ class LLMComparatorApp:
                     if card_index < len(selected_models):
                         with cols[col_idx]:
                             current_model = selected_models[card_index]
-                            model_card_key = f"model-card-{current_model}"
-                            model_card = st.container(key=model_card_key, border=False)
-                            with model_card:
-                                model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
-                                model_response_header.write(f"{current_model}")
-                                url = self.model_manager.models_endpoints[current_model]
-                                api_key = st.session_state.get(self.model_manager.models_api_keys[current_model], "")
-                                if api_key == "":
-                                    st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
-                                model_id = self.model_manager.models_options[current_model]
-                                prompt = st.session_state.prompt.text
-                                # Streaming logic with metrics
-                                response_placeholder = st.empty()
-                                full_response = ""
-                                response_metrics = {
-                                    "time": 0.0,
-                                    "total_tokens": 0,
-                                    "prompt_tokens": 0,
-                                    "completion_tokens": 0,
-                                    "model": model_id,
-                                    "finish_reason": ""
-                                }
-                                for chunk in self.utils.stream_openai_response(
-                                    url=url,
-                                    prompt=prompt,
-                                    api_key=api_key,
-                                    model=model_id,
-                                    temperature=st.session_state.get("temperature", 0.5),
-                                    max_tokens=st.session_state.get("max_token", 1000)
-                                ):
-                                    if chunk["type"] == "content":
-                                        if chunk["content"]:
-                                            full_response += chunk["content"]
-                                            response_placeholder.markdown(full_response + "▌")
-                                        usage = chunk.get("usage", {})
-                                        if usage:
-                                            response_metrics["total_tokens"] = usage.get("total_tokens", 0)
-                                            response_metrics["prompt_tokens"] = usage.get("prompt_tokens", 0)
-                                            response_metrics["completion_tokens"] = usage.get("completion_tokens", 0)
-                                        if chunk.get("finish_reason"):
-                                            response_metrics["finish_reason"] = chunk["finish_reason"]
-                                    elif chunk["type"] == "done":
-                                        response_metrics["time"] = chunk["time"]
-                                    elif chunk["type"] == "error":
-                                        response_placeholder.error(f"Error: {chunk['error']}")
-                                # Remove cursor
-                                response_placeholder.markdown(full_response)
-                                # display response time
-                                model_response_header.write(f"{response_metrics['time']:.2f}s")
-                                # display total tokens
-                                model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
-                                model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
-                                
-                                if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                                    self.final_modal_dialog(current_model, st.session_state.prompt.text, f"{response_metrics['time']:.2f}s", response_metrics['total_tokens'], full_response)
+                            self.render_model_card(current_model, st.session_state.prompt.text)
 
     @staticmethod
     @st.dialog("🎉 Congratulations 🎉")
