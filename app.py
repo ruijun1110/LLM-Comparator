@@ -1,6 +1,12 @@
+import os
 import streamlit as st
 import math
 import pathlib
+import asyncio
+import httpx
+import threading
+import queue
+import json
 
 ################ Functions & Constants ###############
 
@@ -54,7 +60,7 @@ def get_selected_model_names():
     selected_models = []
     for model_key, model_name in models_options.items():
         if st.session_state.get(f"{model_key}-checkbox", False):
-            selected_models.append(model_name)
+            selected_models.append(model_key)
     return selected_models
 
 def check_api_keys_for_selected_models():
@@ -67,23 +73,21 @@ def check_api_keys_for_selected_models():
     """
     # Map models to their required API keys
     model_to_api_key = {
-        "gpt-3-5": "open_ai_api_key",
-        "gpt-4o": "open_ai_api_key",
-        "o1-preview": "open_ai_api_key",
-        "o4-mini-preview": "open_ai_api_key",
-        "gemini-2-0-flash": "google_gemini_api_key",
-        "gemini-2-5-pro": "google_gemini_api_key",
-        "claude-sonnet-3-5": "anthropic_api_key",
-        "claude-sonnet-3-7": "anthropic_api_key",
-        "grok-2": "grok_api_key",
-        "mistral-7b": "mistral_api_key"
+        # "gpt-3-5": "open_ai_api_key",
+        # "gpt-4o": "open_ai_api_key",
+        # "o1-preview": "open_ai_api_key",
+        # "o4-mini-preview": "open_ai_api_key",
+        # "gemini-2-0-flash": "google_gemini_api_key",
+        "gemini-2-5-pro": "openrouter_api_key",
+        "DeepSeek-V3": "openrouter_api_key",
+        "Qwen3": "openrouter_api_key"
     }
     
     # Initialize result dictionary
     api_key_status = {}
     
     # Check each selected model
-    for model_key, model_name in models_options.items():
+    for model_key, _ in models_options.items():
         if st.session_state.get(f"{model_key}-checkbox", False):
             # Get the required API key for this model
             required_key = model_to_api_key.get(model_key)
@@ -96,7 +100,7 @@ def check_api_keys_for_selected_models():
             )
             
             # Store the result
-            api_key_status[model_name] = has_key
+            api_key_status[model_key] = has_key
     
     return api_key_status
 
@@ -124,23 +128,90 @@ def update_api_key(key_name, key_value):
     st.session_state[key_name] = key_value
     has_api_key_error()
 
+def stream_openai_response(url, prompt, api_key, model, temperature=0.5, max_tokens=1000):
+    """Stream OpenAI response asynchronously, compatible with Streamlit write_stream. Only yield the 'content' field."""
+    headers = {"Authorization": f"Bearer {api_key}"}
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    async def fetch():
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("POST", url, headers=headers, json=payload) as response:
+                print(response)
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data.strip() == "[DONE]":
+                            break
+                        try:
+                            delta = json.loads(data)
+                            # OpenAI stream response: {"choices":[{"delta":{"content":"..."}}]}
+                            content = delta.get("choices", [{}])[0].get("delta", {}).get("content")
+                            if content:
+                                yield content
+                        except Exception:
+                            continue
+    q = queue.Queue()
+    sentinel = object()
+    def runner():
+        async def consume():
+            async for chunk in fetch():
+                q.put(chunk)
+            q.put(sentinel)
+        asyncio.run(consume())
+    threading.Thread(target=runner, daemon=True).start()
+    while True:
+        item = q.get()
+        if item is sentinel:
+            break
+        yield item
+
 # List of models available for comparison
 # Key: model class name
-# Value: model display name
+# Value: model id for the API
 models_options = {
-    "gpt-3-5": "GPT-3.5",
+    "gpt-3-5": "gpt-3.5-turbo-0125",
     "gpt-4o": "GPT-4o",
     "o1-preview": "o1 (Preview)",
     "o4-mini-preview": "o4 mini (Preview)",
     "gemini-2-0-flash": "Gemini 2.0 Flash",
-    "gemini-2-5-pro": "Gemini 2.5 Pro",
-    "claude-sonnet-3-5": "Claude Sonnet 3.5",
-    "claude-sonnet-3-7": "Claude Sonnet 3.7",
-    "grok-2": "Grok 2",
-    "mistral-7b": "Mistral 7B"
+    "gemini-2-5-pro": "gemini-2.5-pro-exp-03-25",
+    "Qwen3": "qwen/qwen3-235b-a22b:free",
+    "DeepSeek-V3": "deepseek/deepseek-chat-v3-0324:free",
 }
+
+# Key: model class name
+# Value: API endpoint
+models_endpoints = {
+    "gpt-3-5": "https://api.openai.com/v1/chat/completions",
+    "gpt-4o": "https://api.openai.com/v1/chat/completions",
+    "o1-preview": "https://api.openai.com/v1/chat/completions",
+    "o4-mini-preview": "https://api.openai.com/v1/chat/completions",
+    "gemini-2-0-flash": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    "gemini-2-5-pro": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    "Qwen3": "https://openrouter.ai/api/v1/chat/completions",
+    "DeepSeek-V3": "https://openrouter.ai/api/v1/chat/completions",
+}
+
+# Key: model class name
+# Value: API key name
+models_api_keys = {
+    "gpt-3-5": "open_ai_api_key",
+    "gpt-4o": "open_ai_api_key",
+    "o1-preview": "open_ai_api_key",
+    "o4-mini-preview": "open_ai_api_key",
+    "gemini-2-0-flash": "google_gemini_api_key",
+    "gemini-2-5-pro": "google_gemini_api_key",
+    "Qwen3": "openrouter_api_key",
+    "DeepSeek-V3": "openrouter_api_key",
+}
+
 # Default selected models
-default_selected = ["gpt-4o", "gemini-2-5-pro", "claude-sonnet-3-7"]
+default_selected = ["DeepSeek-V3", "Qwen3"]
 
 # Initialize session states
 if "all_models_selected" not in st.session_state:
@@ -199,10 +270,13 @@ update_api_key("mistral_api_key", mistral_api_key)
 grok_api_key = env_expander.text_input("Grok API Key", type="password", on_change=has_api_key_error)
 update_api_key("grok_api_key", grok_api_key)
 
+openrouter_api_key = env_expander.text_input("OpenRouter API Key", type="password", on_change=has_api_key_error)
+update_api_key("openrouter_api_key", openrouter_api_key)
+
 # Model Selection Checkboxes
 for model_key, model_name in models_options.items():
     is_default = model_key in default_selected
-    config_sidebar.checkbox(model_name, value=is_default, key=f"{model_key}-checkbox", on_change=update_selected_models_count)
+    config_sidebar.checkbox(model_key, value=is_default, key=f"{model_key}-checkbox", on_change=update_selected_models_count)
 
 # Display either "Select All" or "Unselect All" button based on current state
 button_text = "Unselect All" if st.session_state["all_models_selected"] else "Select All"
@@ -271,17 +345,31 @@ if "prompt" in st.session_state and "current_displayed_models" in st.session_sta
                         # Display the model name
                         model_response_header.write(f"{selected_models[card_index]}")
                         # Placeholder for model response time
-                        model_response_header.write("2.5s")
-
-                        # Placeholder for model response
-                        st.write("Loading response...")
+                        # model_response_header.write("2.5s")
+                        print(current_model)
+                        url = models_endpoints[current_model]
+                        api_key = st.session_state.get(models_api_keys[current_model], "")
+                        if api_key == "":
+                            st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
+                        model_id = models_options[current_model]
+                        prompt = st.session_state.prompt.text
+                        st.write_stream(
+                            stream_openai_response(
+                                url=url,
+                                prompt=prompt,
+                                api_key=api_key,
+                                model=model_id,
+                                temperature=st.session_state.get("temperature", 0.5),
+                                max_tokens=st.session_state.get("max_token", 1000)
+                            )
+                        )
 
                         # Model response footer
                         model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
                         # Placeholder for tokens used
-                        model_response_footer.write("1293 tokens")
+                        # model_response_footer.write("1293 tokens")
                         # Button to select the model as the best
                         if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
                             # Display the final modal dialog with the selected model
-                            final_modal_dialog(current_model, st.session_state.prompt.text, "2.5s", "1293 tokens", "This is a test response")
+                            final_modal_dialog(current_model, st.session_state.prompt.text, "? s", "? tokens", "This is a test response")
                             
