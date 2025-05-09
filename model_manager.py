@@ -7,6 +7,8 @@ class ModelManager:
             "o4-mini-preview": "o4 mini (Preview)",
             "gemini-2-0-flash": "Gemini 2.0 Flash",
             "gemini-2-5-pro": "gemini-2.5-pro-exp-03-25",
+            "claude-3-7-sonnet": "claude-3-7-sonnet-20250219",
+            "claude-3-5-haiku": "claude-3-5-haiku-20241022",
             "Qwen3": "qwen/qwen3-235b-a22b:free",
             "DeepSeek-V3": "deepseek/deepseek-chat-v3-0324:free",
         }
@@ -17,6 +19,8 @@ class ModelManager:
             "o4-mini-preview": "https://api.openai.com/v1/chat/completions",
             "gemini-2-0-flash": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             "gemini-2-5-pro": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            "claude-3-7-sonnet": "https://api.anthropic.com/v1/messages",
+            "claude-3-5-haiku": "https://api.anthropic.com/v1/messages",
             "Qwen3": "https://openrouter.ai/api/v1/chat/completions",
             "DeepSeek-V3": "https://openrouter.ai/api/v1/chat/completions",
         }
@@ -27,6 +31,8 @@ class ModelManager:
             "o4-mini-preview": "open_ai_api_key",
             "gemini-2-0-flash": "google_gemini_api_key",
             "gemini-2-5-pro": "google_gemini_api_key",
+            "claude-3-7-sonnet": "anthropic_api_key",
+            "claude-3-5-haiku": "anthropic_api_key",
             "Qwen3": "openrouter_api_key",
             "DeepSeek-V3": "openrouter_api_key",
         }
