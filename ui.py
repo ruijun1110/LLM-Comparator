@@ -54,6 +54,7 @@ class LLMComparatorApp:
                 "model": model_id,
                 "finish_reason": ""
             }
+            print(f"DEBUG: {url}, {prompt}, {api_key}, {model_id}, {st.session_state.get('temperature', 0.5)}, {st.session_state.get('max_token', 1000)}")
             for chunk in self.utils.stream_openai_response(
                 url=url,
                 prompt=prompt,
@@ -62,6 +63,7 @@ class LLMComparatorApp:
                 temperature=st.session_state.get("temperature", 0.5),
                 max_tokens=st.session_state.get("max_token", 1000)
             ):
+                print(f"DEBUG: {chunk}")
                 if chunk["type"] == "content":
                     if chunk["content"]:
                         full_response += chunk["content"]

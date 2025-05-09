@@ -27,7 +27,15 @@ class Utils:
 
     @staticmethod
     def stream_openai_response(url, prompt, api_key, model, temperature=0.5, max_tokens=1000) -> Generator[Dict[str, Any], None, None]:
-        headers = {"Authorization": f"Bearer {api_key}"}
+        if "anthropic" in url:
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+        else:
+            headers = {"Authorization": f"Bearer {api_key}"}
+            
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
@@ -41,6 +49,7 @@ class Utils:
                 try:
                     async with httpx.AsyncClient(timeout=60) as client:
                         async with client.stream("POST", url, headers=headers, json=payload) as response:
+                            print(f"DEBUG: {response}")
                             async for line in response.aiter_lines():
                                 if line.startswith("data: "):
                                     data = line[6:]
@@ -49,7 +58,12 @@ class Utils:
                                     try:
                                         delta = json.loads(data)
                                         # OpenAI stream response: {"choices":[{"delta":{"content":"..."}}], ...}
-                                        content = delta.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                        print(f"DEBUG: delta: {delta}")
+                                        content = delta.get("choices", [{}])[0].get("delta", {}).get("content", None)
+                                        if content is None:
+                                            content = delta.get("delta", {}).get("text", "")
+                                        else:
+                                            content = "ERROR: No content"
                                         finish_reason = delta.get("choices", [{}])[0].get("finish_reason", "")
                                         usage = delta.get("usage", {})
                                         q.put({
