@@ -70,9 +70,12 @@ class LLMComparatorApp:
                         response_placeholder.markdown(full_response + "▌")
                     usage = chunk.get("usage", {})
                     if usage:
-                        response_metrics["total_tokens"] = usage.get("total_tokens", 0)
-                        response_metrics["prompt_tokens"] = usage.get("prompt_tokens", 0)
-                        response_metrics["completion_tokens"] = usage.get("completion_tokens", 0)
+                        total_tokens = usage.get("total_tokens", None)
+                        if not total_tokens:
+                            total_tokens = usage.get("total_tokens", -1)
+                        response_metrics["total_tokens"] = total_tokens
+                        response_metrics["prompt_tokens"] = usage.get("prompt_tokens", -1)
+                        response_metrics["completion_tokens"] = usage.get("completion_tokens", -1)
                     if chunk.get("finish_reason"):
                         response_metrics["finish_reason"] = chunk["finish_reason"]
                 elif chunk["type"] == "done":

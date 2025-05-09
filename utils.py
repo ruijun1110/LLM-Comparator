@@ -49,7 +49,7 @@ class Utils:
                 try:
                     async with httpx.AsyncClient(timeout=60) as client:
                         async with client.stream("POST", url, headers=headers, json=payload) as response:
-                            print(f"DEBUG: {response}")
+                            print(f"DEBUG: response: {response}")
                             async for line in response.aiter_lines():
                                 if line.startswith("data: "):
                                     data = line[6:]
@@ -62,8 +62,6 @@ class Utils:
                                         content = delta.get("choices", [{}])[0].get("delta", {}).get("content", None)
                                         if content is None:
                                             content = delta.get("delta", {}).get("text", "")
-                                        else:
-                                            content = "ERROR: No content"
                                         finish_reason = delta.get("choices", [{}])[0].get("finish_reason", "")
                                         usage = delta.get("usage", {})
                                         q.put({
