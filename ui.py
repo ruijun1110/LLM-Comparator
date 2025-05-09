@@ -48,11 +48,9 @@ class LLMComparatorApp:
             full_response = ""
             response_metrics = {
                 "time": 0.0,
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
+                "total_tokens": None,
                 "model": model_id,
-                "finish_reason": ""
+                "finish_reason": None
             }
             print(f"DEBUG: {url}, {prompt}, {api_key}, {model_id}, {st.session_state.get('temperature', 0.5)}, {st.session_state.get('max_token', 1000)}")
             for chunk in self.utils.stream_openai_response(
@@ -70,12 +68,11 @@ class LLMComparatorApp:
                         response_placeholder.markdown(full_response + "▌")
                     usage = chunk.get("usage", {})
                     if usage:
-                        total_tokens = usage.get("total_tokens", None)
+                        total_tokens = usage.get("total_tokens", None) # OpenAI compatibility
                         if not total_tokens:
-                            total_tokens = usage.get("total_tokens", -1)
+                            total_tokens = usage.get("output_tokens", None) # Anthropic compatibility
                         response_metrics["total_tokens"] = total_tokens
-                        response_metrics["prompt_tokens"] = usage.get("prompt_tokens", -1)
-                        response_metrics["completion_tokens"] = usage.get("completion_tokens", -1)
+                            
                     if chunk.get("finish_reason"):
                         response_metrics["finish_reason"] = chunk["finish_reason"]
                 elif chunk["type"] == "done":
