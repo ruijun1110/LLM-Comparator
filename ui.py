@@ -23,7 +23,9 @@ class LLMComparatorApp:
         config_sidebar.subheader("Models to compare", divider=True)
         env_expander = config_sidebar.expander("Environment Variables", expanded=False)
         for key in self.api_key_manager.api_keys.keys():
-            value = env_expander.text_input(key.replace('_', ' ').title(), type="password")
+            # Use the proper display name
+            display_name = self.api_key_manager.get_display_name(key)
+            value = env_expander.text_input(display_name, type="password")
             self.api_key_manager.update_key(key, value, st.session_state)
         for model_key, model_name in self.model_manager.models_options.items():
             is_default = model_key in self.model_manager.default_selected
@@ -42,8 +44,8 @@ class LLMComparatorApp:
             api_key_name = self.model_manager.models_api_keys[current_model]
             api_key = st.session_state.get(api_key_name, "")
             if api_key == "":
-                # Create a more user-friendly display name for the API key
-                api_key_display_name = api_key_name.replace('_', ' ').title()
+                # Use the proper display name from APIKeyManager
+                api_key_display_name = self.api_key_manager.get_display_name(api_key_name)
                 
                 # Create a more concise error message
                 st.error(f"Missing {api_key_display_name} for {current_model}")
@@ -219,7 +221,8 @@ class LLMComparatorApp:
             required_apis = {}
             for model in missing_keys:
                 api_key_name = self.model_manager.models_api_keys[model]
-                api_display_name = api_key_name.replace('_', ' ').title()
+                # Use the proper display name from APIKeyManager
+                api_display_name = self.api_key_manager.get_display_name(api_key_name)
                 if api_display_name not in required_apis:
                     required_apis[api_display_name] = []
                 required_apis[api_display_name].append(model)
