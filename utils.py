@@ -59,6 +59,16 @@ class Utils:
                                         delta = json.loads(data)
                                         # OpenAI stream response: {"choices":[{"delta":{"content":"..."}}], ...}
                                         print(f"DEBUG: delta: {delta}")
+                                        
+                                        # Check for error in the response
+                                        if "error" in delta:
+                                            error_message = delta.get("error", {}).get("message", "Unknown error occurred")
+                                            q.put({
+                                                "type": "error",
+                                                "error": error_message
+                                            })
+                                            break
+                                        
                                         content = delta.get("choices", [{}])[0].get("delta", {}).get("content", None)
                                         if content is None:
                                             content = delta.get("delta", {}).get("text", "")

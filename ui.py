@@ -42,6 +42,7 @@ class LLMComparatorApp:
             api_key = st.session_state.get(self.model_manager.models_api_keys[current_model], "")
             if api_key == "":
                 st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
+                return
             model_id = self.model_manager.models_options[current_model]
             
             # Check if we already have a cached response for this model and prompt
@@ -49,12 +50,15 @@ class LLMComparatorApp:
             if not st.session_state.get("should_query_api", False) and cache_key in st.session_state.get("response_cache", {}):
                 cached_data = st.session_state.response_cache[cache_key]
                 response_placeholder = st.empty()
-                response_placeholder.markdown(cached_data["full_response"])
-                model_response_header.write(f"{cached_data['time']:.2f}s")
-                model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
-                model_response_footer.write(f"{cached_data['total_tokens']} tokens")
-                if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                    self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data['total_tokens'], cached_data["full_response"])
+                if cached_data.get("error"):
+                    response_placeholder.error(f"Error: {cached_data['error']}")
+                else:
+                    response_placeholder.markdown(cached_data["full_response"])
+                    model_response_header.write(f"{cached_data['time']:.2f}s")
+                    model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
+                    model_response_footer.write(f"{cached_data['total_tokens']} tokens")
+                    if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
+                        self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data['total_tokens'], cached_data["full_response"])
                 return
             
             # Streaming logic with metrics
@@ -66,43 +70,76 @@ class LLMComparatorApp:
                 "model": model_id,
                 "finish_reason": None
             }
+            error_message = None
+            has_received_content = False
+            
             print(f"DEBUG: {url}, {prompt}, {api_key}, {model_id}, {st.session_state.get('temperature', 0.5)}, {st.session_state.get('max_token', 1000)}")
-            for chunk in self.utils.stream_openai_response(
-                url=url,
-                prompt=prompt,
-                api_key=api_key,
-                model=model_id,
-                temperature=st.session_state.get("temperature", 0.5),
-                max_tokens=st.session_state.get("max_token", 1000)
-            ):
-                print(f"DEBUG: {chunk}")
-                if chunk["type"] == "content":
-                    if chunk["content"]:
-                        full_response += chunk["content"]
-                        response_placeholder.markdown(full_response + "▌")
-                    usage = chunk.get("usage", {})
-                    if usage:
-                        total_tokens = usage.get("total_tokens", None) # OpenAI compatibility
-                        if not total_tokens:
-                            total_tokens = usage.get("output_tokens", None) # Anthropic compatibility
-                        response_metrics["total_tokens"] = total_tokens
-                            
-                    if chunk.get("finish_reason"):
-                        response_metrics["finish_reason"] = chunk["finish_reason"]
-                elif chunk["type"] == "done":
-                    response_metrics["time"] = chunk["time"]
-                elif chunk["type"] == "error":
-                    response_placeholder.error(f"Error: {chunk['error']}")
-            # Remove cursor
+            try:
+                for chunk in self.utils.stream_openai_response(
+                    url=url,
+                    prompt=prompt,
+                    api_key=api_key,
+                    model=model_id,
+                    temperature=st.session_state.get("temperature", 0.5),
+                    max_tokens=st.session_state.get("max_token", 1000)
+                ):
+                    print(f"DEBUG: {chunk}")
+                    if chunk["type"] == "content":
+                        if chunk["content"]:
+                            has_received_content = True
+                            full_response += chunk["content"]
+                            response_placeholder.markdown(full_response + "▌")
+                        usage = chunk.get("usage", {})
+                        if usage:
+                            total_tokens = usage.get("total_tokens", None) # OpenAI compatibility
+                            if not total_tokens:
+                                total_tokens = usage.get("output_tokens", None) # Anthropic compatibility
+                            response_metrics["total_tokens"] = total_tokens
+                                
+                        if chunk.get("finish_reason"):
+                            response_metrics["finish_reason"] = chunk["finish_reason"]
+                    elif chunk["type"] == "done":
+                        response_metrics["time"] = chunk["time"]
+                        # If we've reached the end without receiving any content and no error,
+                        # it's likely an empty response due to an error not properly caught
+                        if not has_received_content and not error_message:
+                            error_message = "No response received from the model. This may be due to a rate limit or other API error."
+                            response_placeholder.error(f"Error: {error_message}")
+                    elif chunk["type"] == "error":
+                        error_message = chunk["error"]
+                        response_placeholder.error(f"Error: {error_message}")
+                        break
+            except Exception as e:
+                error_message = str(e)
+                response_placeholder.error(f"Error: {error_message}")
+            
+            # Cache the response
+            if "response_cache" not in st.session_state:
+                st.session_state.response_cache = {}
+                
+            if error_message:
+                st.session_state.response_cache[cache_key] = {
+                    "error": error_message
+                }
+                return
+                
+            # Handle the case where we finished without errors but also without content
+            if not has_received_content:
+                error_message = "No response received from the model. This may be due to a rate limit or other API error."
+                response_placeholder.error(f"Error: {error_message}")
+                st.session_state.response_cache[cache_key] = {
+                    "error": error_message
+                }
+                return
+                
+            # Remove cursor and display result if no error occurred
             response_placeholder.markdown(full_response)
             # Display metrics
             model_response_header.write(f"{response_metrics['time']:.2f}s")
             model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
             model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
             
-            # Cache the response
-            if "response_cache" not in st.session_state:
-                st.session_state.response_cache = {}
+            # Cache the successful response
             st.session_state.response_cache[cache_key] = {
                 "full_response": full_response,
                 "time": response_metrics["time"],
