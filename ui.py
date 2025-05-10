@@ -43,6 +43,20 @@ class LLMComparatorApp:
             if api_key == "":
                 st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
             model_id = self.model_manager.models_options[current_model]
+            
+            # Check if we already have a cached response for this model and prompt
+            cache_key = f"{current_model}_{prompt}"
+            if not st.session_state.get("should_query_api", False) and cache_key in st.session_state.get("response_cache", {}):
+                cached_data = st.session_state.response_cache[cache_key]
+                response_placeholder = st.empty()
+                response_placeholder.markdown(cached_data["full_response"])
+                model_response_header.write(f"{cached_data['time']:.2f}s")
+                model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
+                model_response_footer.write(f"{cached_data['total_tokens']} tokens")
+                if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
+                    self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data['total_tokens'], cached_data["full_response"])
+                return
+            
             # Streaming logic with metrics
             response_placeholder = st.empty()
             full_response = ""
@@ -85,6 +99,16 @@ class LLMComparatorApp:
             model_response_header.write(f"{response_metrics['time']:.2f}s")
             model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
             model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
+            
+            # Cache the response
+            if "response_cache" not in st.session_state:
+                st.session_state.response_cache = {}
+            st.session_state.response_cache[cache_key] = {
+                "full_response": full_response,
+                "time": response_metrics["time"],
+                "total_tokens": response_metrics["total_tokens"]
+            }
+            
             if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
                 self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", response_metrics['total_tokens'], full_response)
 
@@ -102,8 +126,14 @@ class LLMComparatorApp:
             disabled=enough_models_error or required_api_keys_error
         )
         if prompt:
+            # New prompt submitted - set flag to query API
             st.session_state.prompt = prompt
+            st.session_state.should_query_api = True
             st.session_state["current_displayed_models"] = selected_models
+        else:
+            # Set flag to not query API if no new prompt was submitted
+            st.session_state.should_query_api = False
+            
         if enough_models_error:
             st.error("Please select at least two models to compare.")
         if required_api_keys_error:
@@ -124,6 +154,9 @@ class LLMComparatorApp:
                         with cols[col_idx]:
                             current_model = selected_models[card_index]
                             self.render_model_card(current_model, st.session_state.prompt.text)
+            
+            # Reset the API query flag after rendering all models
+            st.session_state.should_query_api = False
 
     @staticmethod
     @st.dialog("🎉 Congratulations 🎉")
@@ -148,6 +181,10 @@ class LLMComparatorApp:
             st.session_state["num_selected_models"] = len(self.model_manager.default_selected)
         if "current_displayed_models" not in st.session_state:
             st.session_state["current_displayed_models"] = []
+        if "response_cache" not in st.session_state:
+            st.session_state.response_cache = {}
+        if "should_query_api" not in st.session_state:
+            st.session_state.should_query_api = False
         # Load CSS
         self.utils.load_css(self.css_path)
         st.html("<h1 style='text-align:center; font-size:2em;'>LLM Model Comparison</h1>")
