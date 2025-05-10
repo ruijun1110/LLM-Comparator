@@ -39,9 +39,15 @@ class LLMComparatorApp:
             model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
             model_response_header.write(f"{current_model}")
             url = self.model_manager.models_endpoints[current_model]
-            api_key = st.session_state.get(self.model_manager.models_api_keys[current_model], "")
+            api_key_name = self.model_manager.models_api_keys[current_model]
+            api_key = st.session_state.get(api_key_name, "")
             if api_key == "":
-                st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
+                # Create a more user-friendly display name for the API key
+                api_key_display_name = api_key_name.replace('_', ' ').title()
+                
+                # Create a more concise error message
+                st.error(f"Missing {api_key_display_name} for {current_model}")
+                
                 # Mark this model as completed with error
                 st.session_state.completed_models.add(current_model)
                 return
@@ -209,7 +215,33 @@ class LLMComparatorApp:
         if enough_models_error:
             st.error("Please select at least two models to compare.")
         if required_api_keys_error:
-            st.error(f"Missing API keys for: {', '.join(missing_keys)}. Please provide them in the Environment Variables section.")
+            # Create a more concise but informative error message
+            required_apis = {}
+            for model in missing_keys:
+                api_key_name = self.model_manager.models_api_keys[model]
+                api_display_name = api_key_name.replace('_', ' ').title()
+                if api_display_name not in required_apis:
+                    required_apis[api_display_name] = []
+                required_apis[api_display_name].append(model)
+            
+            # Display a simple, clean error message
+            if len(required_apis) == 1:
+                # Single API key missing - very simple message
+                api = list(required_apis.keys())[0]
+                models = required_apis[api]
+                if len(models) == 1:
+                    error_msg = f"Missing {api} for {models[0]}"
+                else:
+                    # For multiple models but single API
+                    model_count = len(models)
+                    first_model = models[0]
+                    error_msg = f"Missing {api} for {first_model} and {model_count-1} other model(s)"
+            else:
+                # Multiple API keys - still keep it simple
+                keys_list = ", ".join(required_apis.keys())
+                error_msg = f"Missing API keys: {keys_list}"
+            
+            st.error(error_msg)
         if "prompt" in st.session_state and "current_displayed_models" in st.session_state:
             response_container = st.container(border=False)
             response_container_header = response_container.container(border=False, key="response-container-header")
