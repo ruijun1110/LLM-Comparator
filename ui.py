@@ -42,6 +42,8 @@ class LLMComparatorApp:
             api_key = st.session_state.get(self.model_manager.models_api_keys[current_model], "")
             if api_key == "":
                 st.error(f"Missing API key for {current_model}. Please provide it in the Environment Variables section.")
+                # Mark this model as completed with error
+                st.session_state.completed_models.add(current_model)
                 return
             model_id = self.model_manager.models_options[current_model]
             
@@ -61,6 +63,8 @@ class LLMComparatorApp:
                     model_response_footer.write(token_display)
                     if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
                         self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data.get('total_tokens', 'Unknown'), cached_data["full_response"])
+                # Mark this model as completed (from cache)
+                st.session_state.completed_models.add(current_model)
                 return
             
             # Streaming logic with metrics
@@ -75,7 +79,6 @@ class LLMComparatorApp:
             error_message = None
             has_received_content = False
             
-            print(f"DEBUG: {url}, {prompt}, {api_key}, {model_id}, {st.session_state.get('temperature', 0.5)}, {st.session_state.get('max_token', 1000)}")
             try:
                 for chunk in self.utils.stream_openai_response(
                     url=url,
@@ -85,7 +88,6 @@ class LLMComparatorApp:
                     temperature=st.session_state.get("temperature", 0.5),
                     max_tokens=st.session_state.get("max_token", 1000)
                 ):
-                    print(f"DEBUG: {chunk}")
                     if chunk["type"] == "content":
                         if chunk["content"]:
                             has_received_content = True
@@ -130,6 +132,10 @@ class LLMComparatorApp:
                 st.session_state.response_cache[cache_key] = {
                     "error": error_message
                 }
+                # Mark this model as completed with error
+                st.session_state.completed_models.add(current_model)
+                # Force a page rerun to update the counter
+                st.rerun()
                 return
                 
             # Handle the case where we finished without errors but also without content
@@ -139,6 +145,10 @@ class LLMComparatorApp:
                 st.session_state.response_cache[cache_key] = {
                     "error": error_message
                 }
+                # Mark this model as completed with error
+                st.session_state.completed_models.add(current_model)
+                # Force a page rerun to update the counter
+                st.rerun()
                 return
                 
             # Remove cursor and display result if no error occurred
@@ -156,6 +166,12 @@ class LLMComparatorApp:
                 "time": response_metrics["time"],
                 "total_tokens": response_metrics["total_tokens"]
             }
+            
+            # Mark this model as completed successfully
+            st.session_state.completed_models.add(current_model)
+            
+            # Force a page rerun to update the counter
+            st.rerun()
             
             if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
                 token_count = response_metrics['total_tokens'] if response_metrics['total_tokens'] is not None else "Unknown"
@@ -175,10 +191,17 @@ class LLMComparatorApp:
             disabled=enough_models_error or required_api_keys_error
         )
         if prompt:
-            # New prompt submitted - set flag to query API
+            # New prompt submitted - clear previous responses
+            if "response_cache" in st.session_state:
+                st.session_state.response_cache = {}
+            
+            # Set the new prompt and query flag
             st.session_state.prompt = prompt
             st.session_state.should_query_api = True
             st.session_state["current_displayed_models"] = selected_models
+            
+            # Reset completed models tracking
+            st.session_state.completed_models = set()
         else:
             # Set flag to not query API if no new prompt was submitted
             st.session_state.should_query_api = False
@@ -191,7 +214,35 @@ class LLMComparatorApp:
             response_container = st.container(border=False)
             response_container_header = response_container.container(border=False, key="response-container-header")
             response_container_header.html("<p style='font-size: 1.5rem; font-weight: bold;'>Model Responses</p>")
-            response_container_header.html("<p style='color: gray;'>Click on the model you want to select as the best.</p>")
+            
+            # Make sure completed_models exists
+            if "completed_models" not in st.session_state:
+                st.session_state.completed_models = set()
+                
+            # Add progress indicator for model processing
+            total_models = len(st.session_state["current_displayed_models"])
+            completed_models = len(st.session_state.completed_models)
+            
+            # Check if all models are complete
+            if completed_models >= total_models:
+                response_container_header.html(
+                    """
+                    <p style='color: gray; font-weight: 500; font-size: 1.1em;'>
+                        Please select the response you prefer the most
+                    </p>
+                    """
+                )
+            else:
+                progress_text = f"Processing model responses: {completed_models}/{total_models}"
+                response_container_header.html(
+                    f"""
+                    <div class="model-loading-indicator">
+                        <div class="progress-spinner">⏳</div>
+                        <div class="progress-text">{progress_text}</div>
+                    </div>
+                    """
+                )
+            
             selected_models = st.session_state["current_displayed_models"]
             import math
             num_rows = math.ceil(len(selected_models) / 3)
@@ -234,6 +285,8 @@ class LLMComparatorApp:
             st.session_state.response_cache = {}
         if "should_query_api" not in st.session_state:
             st.session_state.should_query_api = False
+        if "completed_models" not in st.session_state:
+            st.session_state.completed_models = set()
         # Load CSS
         self.utils.load_css(self.css_path)
         st.html("<h1 style='text-align:center; font-size:2em;'>LLM Model Comparison</h1>")

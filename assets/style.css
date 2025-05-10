@@ -20,6 +20,10 @@
     border-radius: 0.5rem;
     min-height: 400px;
     position: relative;
+    padding-bottom: 70px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
 [class^="st-key-model-card-"]:hover,
@@ -52,16 +56,15 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 1rem 0;
-
+    width: 100%;
+    padding: 1rem;
+    background-color: var(--background-color, #1e1e1e);
     border-top: 1px solid gray;
+    border-radius: 0 0 0.5rem 0.5rem;
 }
 
 [class^="st-key-model-response-footer-"]>div:nth-child(1),
@@ -75,4 +78,35 @@
 
 .st-key-final-response-container {
     padding: 0.5rem;
+}
+
+/* Hide Streamlit's default running indicator */
+[data-testid="stStatusWidget"] {
+    display: none !important;
+}
+
+/* Custom progress indicator for model responses */
+.model-loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+    color: gray;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.model-loading-indicator .progress-spinner {
+    animation: spin 2s linear infinite;
+    margin-right: 10px;
+    font-size: 1.2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.model-loading-indicator .progress-text {
+    margin-left: 10px;
 }

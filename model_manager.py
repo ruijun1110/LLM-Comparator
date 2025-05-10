@@ -9,7 +9,7 @@ class ModelManager:
             "Claude 3.5 Haiku": "claude-3-5-haiku-20241022",
             "Llama 4 Maverick": "meta-llama/llama-4-maverick:free",
             "Mistral Small 3.1 24B": "mistralai/mistral-small-3.1-24b-instruct:free",
-            "Qwen3": "qwen/qwen3-235b-a22b:free",
+            "Grok 3 Mini Beta": "x-ai/grok-3-mini-beta",
             "DeepSeek-V3": "deepseek/deepseek-chat-v3-0324:free",
         }
         self.models_endpoints = {
@@ -21,7 +21,7 @@ class ModelManager:
             "Claude 3.5 Haiku": "https://api.anthropic.com/v1/messages",
             "Llama 4 Maverick": "https://openrouter.ai/api/v1/chat/completions",
             "Mistral Small 3.1 24B": "https://openrouter.ai/api/v1/chat/completions",
-            "Qwen3": "https://openrouter.ai/api/v1/chat/completions",
+            "Grok 3 Mini Beta": "https://openrouter.ai/api/v1/chat/completions",
             "DeepSeek-V3": "https://openrouter.ai/api/v1/chat/completions",
         }
         self.models_api_keys = {
@@ -33,10 +33,10 @@ class ModelManager:
             "Claude 3.5 Haiku": "anthropic_api_key",
             "Llama 4 Maverick": "openrouter_api_key",
             "Mistral Small 3.1 24B": "openrouter_api_key",
-            "Qwen3": "openrouter_api_key",
             "DeepSeek-V3": "openrouter_api_key",
+            "Grok 3 Mini Beta": "openrouter_api_key",
         }
-        self.default_selected = ["DeepSeek-V3", "Qwen3"]
+        self.default_selected = ["DeepSeek-V3", "GPT-4o"]
 
     def get_selected_models(self, session_state):
         selected_models = []
