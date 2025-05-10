@@ -1,3 +1,4 @@
 streamlit
 httpx
 asyncio
+tiktoken

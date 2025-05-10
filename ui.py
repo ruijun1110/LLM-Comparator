@@ -56,9 +56,11 @@ class LLMComparatorApp:
                     response_placeholder.markdown(cached_data["full_response"])
                     model_response_header.write(f"{cached_data['time']:.2f}s")
                     model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
-                    model_response_footer.write(f"{cached_data['total_tokens']} tokens")
+                    # Display token count or "None" if not available
+                    token_display = f"{cached_data['total_tokens']} tokens" if cached_data['total_tokens'] is not None else "Unknown tokens"
+                    model_response_footer.write(token_display)
                     if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                        self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data['total_tokens'], cached_data["full_response"])
+                        self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data.get('total_tokens', 'Unknown'), cached_data["full_response"])
                 return
             
             # Streaming logic with metrics
@@ -100,6 +102,13 @@ class LLMComparatorApp:
                             response_metrics["finish_reason"] = chunk["finish_reason"]
                     elif chunk["type"] == "done":
                         response_metrics["time"] = chunk["time"]
+                        # Check if the done event contains token usage data
+                        usage = chunk.get("usage", {})
+                        if usage:
+                            total_tokens = usage.get("total_tokens", None)
+                            if total_tokens:
+                                response_metrics["total_tokens"] = total_tokens
+                        
                         # If we've reached the end without receiving any content and no error,
                         # it's likely an empty response due to an error not properly caught
                         if not has_received_content and not error_message:
@@ -137,7 +146,9 @@ class LLMComparatorApp:
             # Display metrics
             model_response_header.write(f"{response_metrics['time']:.2f}s")
             model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
-            model_response_footer.write(f"{response_metrics['total_tokens']} tokens")
+            # Display token count or "Unknown" if not available
+            token_display = f"{response_metrics['total_tokens']} tokens" if response_metrics['total_tokens'] is not None else "Unknown tokens"
+            model_response_footer.write(token_display)
             
             # Cache the successful response
             st.session_state.response_cache[cache_key] = {
@@ -147,7 +158,8 @@ class LLMComparatorApp:
             }
             
             if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", response_metrics['total_tokens'], full_response)
+                token_count = response_metrics['total_tokens'] if response_metrics['total_tokens'] is not None else "Unknown"
+                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", token_count, full_response)
 
     def render_main(self):
         chat_input_container = st.container(border=False)
