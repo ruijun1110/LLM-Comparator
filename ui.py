@@ -38,8 +38,10 @@ class LLMComparatorApp:
         model_card_key = f"model-card-{current_model}"
         model_card = st.container(key=model_card_key, border=False)
         with model_card:
+            # Create a consistently styled header
             model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
             model_response_header.write(f"{current_model}")
+            
             url = self.model_manager.models_endpoints[current_model]
             api_key_name = self.model_manager.models_api_keys[current_model]
             api_key = st.session_state.get(api_key_name, "")
@@ -64,13 +66,15 @@ class LLMComparatorApp:
                     response_placeholder.error(f"Error: {cached_data['error']}")
                 else:
                     response_placeholder.markdown(cached_data["full_response"])
+                    # Update the time in the header 
                     model_response_header.write(f"{cached_data['time']:.2f}s")
                     model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
                     # Display token count or "None" if not available
                     token_display = f"{cached_data['total_tokens']} tokens" if cached_data['total_tokens'] is not None else "Unknown tokens"
                     model_response_footer.write(token_display)
+                    temperature = st.session_state.get("temperature", 0.5)
                     if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                        self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data.get('total_tokens', 'Unknown'), cached_data["full_response"])
+                        self.final_modal_dialog(current_model, prompt, f"{cached_data['time']:.2f}s", cached_data.get('total_tokens', 'Unknown'), cached_data["full_response"], temperature)
                 # Mark this model as completed (from cache)
                 st.session_state.completed_models.add(current_model)
                 return
@@ -86,6 +90,7 @@ class LLMComparatorApp:
             }
             error_message = None
             has_received_content = False
+            temperature = st.session_state.get("temperature", 0.5)
             
             try:
                 for chunk in self.utils.stream_openai_response(
@@ -93,7 +98,7 @@ class LLMComparatorApp:
                     prompt=prompt,
                     api_key=api_key,
                     model=model_id,
-                    temperature=st.session_state.get("temperature", 0.5),
+                    temperature=temperature,
                     max_tokens=st.session_state.get("max_token", 1000)
                 ):
                     if chunk["type"] == "content":
@@ -183,7 +188,7 @@ class LLMComparatorApp:
             
             if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
                 token_count = response_metrics['total_tokens'] if response_metrics['total_tokens'] is not None else "Unknown"
-                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", token_count, full_response)
+                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", token_count, full_response, temperature)
 
     def render_main(self):
         chat_input_container = st.container(border=False)
@@ -295,17 +300,52 @@ class LLMComparatorApp:
 
     @staticmethod
     @st.dialog("🎉 Congratulations 🎉")
-    def final_modal_dialog(model_name, input_prompt, time_taken, tokens_used, model_response):
-        st.html("<h3 style='text-align:center;'>You have found the best model for your task!</h3>")
-        st.html(f"<h1 style='text-align:center; font-size:2em; color: yellow;'>{model_name}</h1>")
-        st.write("**Input Prompt:**")
+    def final_modal_dialog(model_name, input_prompt, time_taken, tokens_used, model_response, temperature=0.5):
+        # Header with model name
+        st.html("<h3 style='text-align:center; margin-bottom:5px;'>You have found the best model for your task!</h3>")
+        st.html(f"<h1 style='text-align:center; font-size:2.2em; color: #f1c40f; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); margin-bottom:20px;'>{model_name}</h1>")
+        
+        # Style for section titles with gradient underline effect - added consistent margins
+        section_title_style = "color: #3498db; font-size: 1.2em; font-weight: bold; margin-top: 20px; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid; border-image: linear-gradient(to right, #3498db, transparent) 1;"
+        
+        # Input Prompt Section
+        st.markdown(f"<div style='{section_title_style}'>Input Prompt</div>", unsafe_allow_html=True)
         prompt_container = st.container(border=False, key="final-prompt-container")
-        prompt_container.write(input_prompt)
-        st.write("**Model Response:**")
+        prompt_container.markdown(f"<div style='font-family:monospace; padding: 5px;'>{input_prompt}</div>", unsafe_allow_html=True)
+        
+        # Model Response Section - ensure consistent spacing
+        st.markdown(f"<div style='{section_title_style}'>Model Response</div>", unsafe_allow_html=True)
         response_container = st.container(border=False, key="final-response-container")
-        response_container.write(model_response)
-        st.write("**Time Taken:**", time_taken)
-        st.write("**Tokens Used:**", tokens_used)
+        # Convert markdown to HTML if possible, otherwise use plain text
+        try:
+            import markdown
+            response_html = markdown.markdown(model_response)
+            response_container.markdown(f"<div style='font-family:sans-serif; line-height:1.5;'>{response_html}</div>", unsafe_allow_html=True)
+        except:
+            response_container.markdown(model_response)
+        
+        # Performance Metrics Section (renamed from Model Parameters)
+        st.markdown(f"<div style='{section_title_style.replace('#3498db', '#f39c12')}'>Performance Metrics</div>", unsafe_allow_html=True)
+        param_container = st.container(border=False, key="final-params-container")
+        
+        # Create three columns for parameters
+        param_cols = param_container.columns(3)
+        
+        # Column 1: Time Taken
+        with param_cols[0]:
+            st.markdown("<span style='color: #95a5a6; font-weight: 500; font-size: 0.9em;'>TIME TAKEN</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size: 1.3em; font-family: monospace; color: #2ecc71;'>{time_taken}</span>", unsafe_allow_html=True)
+        
+        # Column 2: Tokens Used
+        with param_cols[1]:
+            st.markdown("<span style='color: #95a5a6; font-weight: 500; font-size: 0.9em;'>TOKENS USED</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size: 1.3em; font-family: monospace; color: #e67e22;'>{tokens_used}</span>", unsafe_allow_html=True)
+            
+        # Column 3: Temperature
+        with param_cols[2]:
+            st.markdown("<span style='color: #95a5a6; font-weight: 500; font-size: 0.9em;'>TEMPERATURE</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size: 1.3em; font-family: monospace; color: #3498db;'>{temperature}</span>", unsafe_allow_html=True)
+        
         st.balloons()
 
     def run(self):

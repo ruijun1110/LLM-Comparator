@@ -16,7 +16,7 @@
 [class^="st-key-model-card-"],
 [class*=" st-key-model-card-"] {
     border: 2px solid gray;
-    padding: calc(-1px + 1rem);
+    padding: 0;
     border-radius: 0.5rem;
     min-height: 400px;
     position: relative;
@@ -24,11 +24,15 @@
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 [class^="st-key-model-card-"]:hover,
 [class*=" st-key-model-card-"]:hover{
-    border-color:orange;
+    border-color: #3498db;
+    transform: translateY(-2px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 [class^="st-key-model-response-header-"],
@@ -38,17 +42,30 @@
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid gray;
+    background-color: var(--background-color, #1e1e1e);
+    padding: 1rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+    width: 100%;
+    position: relative;
+    left: 0;
+    right: 0;
+    top: 0;
+    margin: 0;
 }
 
 [class^="st-key-model-response-header-"] > div:nth-child(1),
 [class*=" st-key-model-response-header-"] > div:nth-child(1) {
-    font-weight: bolder;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #e0e0e0;
 }
 
 [class^="st-key-model-response-header-"] > div:nth-child(2),
 [class*=" st-key-model-response-header-"] > div:nth-child(2) {
-    color: gray;
-} 
+    color: #2ecc71;
+    font-weight: 500;
+    font-family: monospace;
+}
 
 [class^="st-key-model-response-footer-"],
 [class*=" st-key-model-response-footer-"] {
@@ -72,12 +89,79 @@
     color: gray;
 }
 
-.st-key-final-prompt-container {
-    padding: 0.5rem;
+/* Style for the final modal dialog sections */
+.st-key-final-prompt-container,
+.st-key-final-response-container {
+    background-color: rgba(25, 25, 25, 0.6);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 3px solid #3498db;
+    margin-top: 15px;
 }
 
-.st-key-final-response-container {
-    padding: 0.5rem;
+/* Parameter container in the final dialog */
+.st-key-final-params-container {
+    background-color: rgba(25, 25, 25, 0.6);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border-left: 3px solid #f39c12;
+}
+
+/* Remove default borders from the parameters container */
+.st-key-final-params-container > div {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Consistent spacing for section titles in modal */
+[data-testid="stDialog"] [data-testid="stMarkdown"] {
+    margin-bottom: 5px !important;
+}
+
+/* Remove any extra padding in the dialog */
+[data-testid="stDialog"] [data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+}
+
+/* Match the button styles in the modal */
+[data-testid="baseButton-secondary"] {
+    background-color: #3498db !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+    transition: all 0.3s ease;
+}
+
+[data-testid="baseButton-secondary"]:hover {
+    background-color: #2980b9 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Dialog overlay styling */
+[data-testid="stDialog"] {
+    border-radius: 12px !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Enhance the select button in model cards */
+[class^="st-key-select-button-"] button,
+[class*=" st-key-select-button-"] button {
+    background-color: #3498db !important;
+    color: white !important;
+    border: none !important;
+    padding: 5px 15px !important;
+    border-radius: 5px !important;
+    transition: all 0.2s ease;
+}
+
+[class^="st-key-select-button-"] button:hover,
+[class*=" st-key-select-button-"] button:hover {
+    background-color: #2980b9 !important;
+    transform: scale(1.05);
 }
 
 /* Hide Streamlit's default running indicator */
@@ -109,4 +193,21 @@
 
 .model-loading-indicator .progress-text {
     margin-left: 10px;
+}
+
+/* Add styles for the model content area */
+[class^="st-key-model-card-"] > div:not([class^="st-key-model-response-footer-"]):not([class^="st-key-model-response-header-"]),
+[class*=" st-key-model-card-"] > div:not([class*="st-key-model-response-footer-"]):not([class*="st-key-model-response-header-"]) {
+    overflow-y: auto;
+    max-height: calc(100% - 120px);
+    padding: 1rem;
+}
+
+/* Custom styling for the model card when hovered */
+[class^="st-key-model-card-"]:hover,
+[class*=" st-key-model-card-"]:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
