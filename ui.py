@@ -38,7 +38,6 @@ class LLMComparatorApp:
         model_card_key = f"model-card-{current_model}"
         model_card = st.container(key=model_card_key, border=False)
         with model_card:
-            # Create a consistently styled header
             model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
             model_response_header.write(f"{current_model}")
             

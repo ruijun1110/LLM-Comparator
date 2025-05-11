@@ -20,7 +20,8 @@
     border-radius: 0.5rem;
     min-height: 400px;
     position: relative;
-    padding-bottom: 70px;
+    padding-top: 40px;
+    padding-bottom: 60px;
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
@@ -43,10 +44,11 @@
     align-items: center;
     border-bottom: 1px solid gray;
     background-color: var(--background-color, #1e1e1e);
-    padding: 1rem;
     border-radius: 0.5rem 0.5rem 0 0;
+    padding: 1rem;
     width: 100%;
-    position: relative;
+    padding: 1rem;
+    position: absolute;
     left: 0;
     right: 0;
     top: 0;
@@ -55,9 +57,9 @@
 
 [class^="st-key-model-response-header-"] > div:nth-child(1),
 [class*=" st-key-model-response-header-"] > div:nth-child(1) {
-    font-weight: bold;
+    font-weight: bolder;
     font-size: 1.1em;
-    color: #e0e0e0;
+    color: white;
 }
 
 [class^="st-key-model-response-header-"] > div:nth-child(2),
