@@ -145,7 +145,7 @@ class Utils:
                                                     content = None
                                                     if delta.get('type') == 'content_block_delta':
                                                         content = delta.get('delta', {}).get('text', '')
-                                                    elif delta.get('type') == 'message_stop':
+                                                    elif delta.get('type') == 'message_delta':
                                                         # End of message
                                                         finish_reason = "stop"
                                                         q.put({
