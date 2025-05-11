@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import dataclass
 from typing import Generator, Dict, Any
-import tiktoken  # Import tiktoken for accurate token counting
+import tiktoken
 
 @dataclass
 class StreamResponse:
