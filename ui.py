@@ -187,8 +187,6 @@ class LLMComparatorApp:
         required_api_keys_error = len(missing_keys) > 0
         prompt = chat_input_container.chat_input(
             placeholder="Enter your test prompt here...",
-            accept_file=True, key="prompt_input",
-            file_type=["jpg", "jpeg", "png", "txt", "pdf", "docx", "csv"],
             disabled=enough_models_error or required_api_keys_error
         )
         if prompt:
@@ -283,7 +281,7 @@ class LLMComparatorApp:
                         with cols[col_idx]:
                             current_model = selected_models[card_index]
                             # Pass the response index (1-based) for anonymous mode
-                            self.render_model_card(current_model, st.session_state.prompt.text, response_index=card_index+1)
+                            self.render_model_card(current_model, st.session_state.prompt, response_index=card_index+1)
             
             # Reset the API query flag after rendering all models
             st.session_state.should_query_api = False
