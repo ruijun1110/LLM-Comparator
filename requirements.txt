@@ -2,3 +2,4 @@ streamlit
 httpx
 asyncio
 tiktoken
+python-dotenv

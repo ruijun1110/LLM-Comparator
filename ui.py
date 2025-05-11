@@ -31,7 +31,9 @@ class LLMComparatorApp:
         for key in self.api_key_manager.api_keys.keys():
             # Use the proper display name
             display_name = self.api_key_manager.get_display_name(key)
-            value = env_expander.text_input(display_name, type="password")
+            # Get the current value from session state or use empty string
+            current_value = st.session_state.get(key, "")
+            value = env_expander.text_input(display_name, value=current_value, type="password")
             self.api_key_manager.update_key(key, value, st.session_state)
         for model_key, model_name in self.model_manager.models_options.items():
             is_default = model_key in self.model_manager.default_selected
@@ -352,6 +354,15 @@ class LLMComparatorApp:
             st.session_state.completed_models = set()
         if "anonymous_mode" not in st.session_state:
             st.session_state.anonymous_mode = False
+            
+        # Load API keys from .env file if available
+        if "env_keys_loaded" not in st.session_state:
+            # Only try to load from .env once per session
+            keys_loaded = self.api_key_manager.load_from_env_file(st.session_state)
+            st.session_state["env_keys_loaded"] = True
+            if keys_loaded:
+                st.success("API keys loaded from .env file", icon="✅")
+                
         # Load CSS
         self.utils.load_css(self.css_path)
         st.html("<h1 style='text-align:center; font-size:2em;'>LLM Model Comparison</h1>")

@@ -1,3 +1,7 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
 class APIKeyManager:
     def __init__(self):
         self.api_keys = {
@@ -11,10 +15,34 @@ class APIKeyManager:
             "open_ai_api_key": "OpenAI API Key",
             "anthropic_api_key": "Anthropic API Key",
             "openrouter_api_key": "OpenRouter API Key",
-            "google_gemini_api_key": "Google Gemini API Key",
-            "mistral_api_key": "Mistral API Key",
-            "grok_api_key": "Grok API Key"
         }
+
+        # Mapping between environment variable names and session state keys
+        self.env_to_session_mapping = {
+            "OPENAI_API_KEY": "open_ai_api_key",
+            "ANTHROPIC_API_KEY": "anthropic_api_key",
+            "OPENROUTER_API_KEY": "openrouter_api_key",
+        }
+
+    def load_from_env_file(self, session_state):
+        """Load API keys from .env file if it exists and update session state."""
+        # Check if .env file exists
+        env_path = Path('.') / '.env'
+        if not env_path.exists():
+            return False
+
+        # Load environment variables from .env file
+        load_dotenv()
+
+        # Update session state with values from environment variables
+        keys_loaded = False
+        for env_var, session_key in self.env_to_session_mapping.items():
+            value = os.getenv(env_var)
+            if value and value.strip() and value != f"your_{env_var.lower()}_here":
+                session_state[session_key] = value
+                keys_loaded = True
+        
+        return keys_loaded
 
     def get_display_name(self, key_name):
         """Return a properly formatted display name for an API key."""
