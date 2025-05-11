@@ -1,5 +1,6 @@
 import streamlit as st
 import pathlib
+import math
 from model_manager import ModelManager
 from apikey_manager import APIKeyManager
 from utils import Utils
@@ -14,6 +15,11 @@ class LLMComparatorApp:
     def render_sidebar(self):
         config_sidebar = st.sidebar
         config_sidebar.subheader("Basic Configuration", divider=True)
+        
+        # Add the anonymous mode toggle
+        anonymous_mode = config_sidebar.toggle("Anonymous Response Mode", value=False, key="anonymous_mode",
+                                             help="When enabled, model names will be hidden until final selection.")
+        
         temperature = config_sidebar.slider("Temperature", 0.0, 1.0, 0.5, key="temperature_slider")
         if temperature:
             st.session_state.temperature = temperature
@@ -34,12 +40,17 @@ class LLMComparatorApp:
         config_sidebar.button(button_text, key="select_all_button", use_container_width=True, on_click=lambda: self.model_manager.toggle_all(st.session_state))
         self.model_manager.update_all_selected_state(st.session_state)
 
-    def render_model_card(self, current_model, prompt):
+    def render_model_card(self, current_model, prompt, response_index=None):
         model_card_key = f"model-card-{current_model}"
         model_card = st.container(key=model_card_key, border=False)
         with model_card:
             model_response_header = st.container(border=False, key=f"model-response-header-{model_card_key}")
-            model_response_header.write(f"{current_model}")
+            
+            # Determine whether to show real model name or anonymous response label
+            is_anonymous = st.session_state.get("anonymous_mode", False)
+            display_name = f"Response {response_index}" if is_anonymous else current_model
+            
+            model_response_header.write(f"{display_name}")
             
             url = self.model_manager.models_endpoints[current_model]
             api_key_name = self.model_manager.models_api_keys[current_model]
@@ -144,40 +155,22 @@ class LLMComparatorApp:
                 st.session_state.response_cache[cache_key] = {
                     "error": error_message
                 }
-                # Mark this model as completed with error
-                st.session_state.completed_models.add(current_model)
-                # Force a page rerun to update the counter
-                st.rerun()
-                return
+            else:
+                response_placeholder.markdown(full_response)
+                # Update the time in the header
+                model_response_header.write(f"{response_metrics['time']:.2f}s")
+                model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
+                # Display token count
+                token_display = f"{response_metrics['total_tokens']} tokens" if response_metrics['total_tokens'] is not None else "Unknown tokens"
+                model_response_footer.write(token_display)
                 
-            # Handle the case where we finished without errors but also without content
-            if not has_received_content:
-                error_message = "No response received from the model. This may be due to a rate limit or other API error."
-                response_placeholder.error(f"Error: {error_message}")
+                # Cache the successful response
                 st.session_state.response_cache[cache_key] = {
-                    "error": error_message
+                    "full_response": full_response,
+                    "error": None,
+                    "time": response_metrics["time"],
+                    "total_tokens": response_metrics["total_tokens"]
                 }
-                # Mark this model as completed with error
-                st.session_state.completed_models.add(current_model)
-                # Force a page rerun to update the counter
-                st.rerun()
-                return
-                
-            # Remove cursor and display result if no error occurred
-            response_placeholder.markdown(full_response)
-            # Display metrics
-            model_response_header.write(f"{response_metrics['time']:.2f}s")
-            model_response_footer = st.container(border=False, key=f"model-response-footer-{model_card_key}")
-            # Display token count or "Unknown" if not available
-            token_display = f"{response_metrics['total_tokens']} tokens" if response_metrics['total_tokens'] is not None else "Unknown tokens"
-            model_response_footer.write(token_display)
-            
-            # Cache the successful response
-            st.session_state.response_cache[cache_key] = {
-                "full_response": full_response,
-                "time": response_metrics["time"],
-                "total_tokens": response_metrics["total_tokens"]
-            }
             
             # Mark this model as completed successfully
             st.session_state.completed_models.add(current_model)
@@ -185,10 +178,6 @@ class LLMComparatorApp:
             # Force a page rerun to update the counter
             st.rerun()
             
-            if model_response_footer.button("Select", key=f"select-button-{model_card_key}"):
-                token_count = response_metrics['total_tokens'] if response_metrics['total_tokens'] is not None else "Unknown"
-                self.final_modal_dialog(current_model, prompt, f"{response_metrics['time']:.2f}s", token_count, full_response, temperature)
-
     def render_main(self):
         chat_input_container = st.container(border=False)
         selected_models = self.model_manager.get_selected_models(st.session_state)
@@ -283,7 +272,8 @@ class LLMComparatorApp:
                 )
             
             selected_models = st.session_state["current_displayed_models"]
-            import math
+            
+            # Calculate number of rows needed for the model response cards
             num_rows = math.ceil(len(selected_models) / 3)
             for row_idx in range(num_rows):
                 cols = response_container.columns(3)
@@ -292,7 +282,8 @@ class LLMComparatorApp:
                     if card_index < len(selected_models):
                         with cols[col_idx]:
                             current_model = selected_models[card_index]
-                            self.render_model_card(current_model, st.session_state.prompt.text)
+                            # Pass the response index (1-based) for anonymous mode
+                            self.render_model_card(current_model, st.session_state.prompt.text, response_index=card_index+1)
             
             # Reset the API query flag after rendering all models
             st.session_state.should_query_api = False
@@ -361,6 +352,8 @@ class LLMComparatorApp:
             st.session_state.should_query_api = False
         if "completed_models" not in st.session_state:
             st.session_state.completed_models = set()
+        if "anonymous_mode" not in st.session_state:
+            st.session_state.anonymous_mode = False
         # Load CSS
         self.utils.load_css(self.css_path)
         st.html("<h1 style='text-align:center; font-size:2em;'>LLM Model Comparison</h1>")
