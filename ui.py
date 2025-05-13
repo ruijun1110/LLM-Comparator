@@ -365,6 +365,6 @@ class LLMComparatorApp:
                 
         # Load CSS
         self.utils.load_css(self.css_path)
-        st.html("<h1 style='text-align:center; font-size:2em;'>LLM Model Comparison</h1>")
+        st.html("<h1 style='text-align:center; font-size:2em;'>LLM Comparator</h1>")
         self.render_sidebar()
         self.render_main() 
