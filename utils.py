@@ -94,7 +94,6 @@ class Utils:
                                 non_stream_payload["stream"] = False
                                 
                                 # Create a new streaming request, but instead of using client.stream, 
-                                # we'll use a regular POST and read chunks manually
                                 response = await client.post(
                                     url, 
                                     headers=headers, 
@@ -139,7 +138,6 @@ class Utils:
                                                     
                                                 try:
                                                     delta = json.loads(data)
-                                                    print(f"DEBUG Anthropic: {delta}")
                                                     
                                                     # Anthropic formats: content_block_delta or message_delta
                                                     content = None
@@ -186,7 +184,6 @@ class Utils:
                         # Original code for non-Anthropic APIs
                         async with httpx.AsyncClient(timeout=60) as client:
                             async with client.stream("POST", url, headers=headers, json=payload) as response:
-                                print(f"DEBUG: response: {response}")
                                 
                                 if response.status_code != 200:
                                     # Handle non-200 responses
@@ -209,8 +206,6 @@ class Utils:
                                             break
                                         try:
                                             delta = json.loads(data)
-                                            # OpenAI stream response: {"choices":[{"delta":{"content":"..."}}], ...}
-                                            print(f"DEBUG: delta: {delta}")
                                             
                                             # Check for error in the response
                                             if "error" in delta:
